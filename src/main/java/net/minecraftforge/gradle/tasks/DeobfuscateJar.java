@@ -299,18 +299,14 @@ public class DeobfuscateJar extends CachedTask
 
     private void removeUnknownClasses(File inJar, Map<String, MCInjectorStruct> config) throws IOException
     {
-        ZipFile zip = new ZipFile(inJar);
-        try
-        {
+        try (ZipFile zip = new ZipFile(inJar)) {
             Iterator<Map.Entry<String, MCInjectorStruct>> entries = config.entrySet().iterator();
-            while (entries.hasNext())
-            {
+            while (entries.hasNext()) {
                 Map.Entry<String, MCInjectorStruct> entry = entries.next();
                 String className = entry.getKey();
 
                 // Verify the configuration contains only classes we actually have
-                if (zip.getEntry(className + ".class") == null)
-                {
+                if (zip.getEntry(className + ".class") == null) {
                     getLogger().info("Removing unknown class {}", className);
                     entries.remove();
                     continue;
@@ -319,24 +315,17 @@ public class DeobfuscateJar extends CachedTask
                 MCInjectorStruct struct = entry.getValue();
 
                 // Verify the inner classes in the configuration actually exist in our deobfuscated JAR file
-                if (struct.innerClasses != null)
-                {
+                if (struct.innerClasses != null) {
                     Iterator<InnerClass> innerClasses = struct.innerClasses.iterator();
-                    while (innerClasses.hasNext())
-                    {
+                    while (innerClasses.hasNext()) {
                         InnerClass innerClass = innerClasses.next();
-                        if (zip.getEntry(innerClass.inner_class + ".class") == null)
-                        {
+                        if (zip.getEntry(innerClass.inner_class + ".class") == null) {
                             getLogger().info("Removing unknown inner class {} from {}", innerClass.inner_class, className);
                             innerClasses.remove();
                         }
                     }
                 }
             }
-        }
-        finally
-        {
-            zip.close();
         }
     }
 

@@ -185,9 +185,14 @@ public class PostDecompileTask extends AbstractEditJarTask
             getLogger().debug("Adding package-infos");
             for (String pkg : this.seenPackages)
             {
-                jarOut.putNextEntry(new ZipEntry(pkg + "/package-info.java"));
-                jarOut.write(template.replaceAll("\\{PACKAGE\\}", pkg.replace('/', '.')).getBytes());
-                jarOut.closeEntry();
+                try
+                {
+                    jarOut.putNextEntry(new ZipEntry(pkg + "/package-info.java"));
+                    jarOut.write(template.replaceAll("\\{PACKAGE\\}", pkg.replace('/', '.')).getBytes());
+                } finally
+                {
+                    jarOut.closeEntry();
+                }
             }
         }
         File common = new File(file, "common/");
@@ -196,9 +201,14 @@ public class PostDecompileTask extends AbstractEditJarTask
             for (File f : this.getProject().fileTree(common))
             {
                 String name = f.getAbsolutePath().substring(common.getAbsolutePath().length() + 1).replace('\\', '/');
-                jarOut.putNextEntry(new ZipEntry(name));
-                jarOut.write(Resources.toByteArray(f.toURI().toURL()));
-                jarOut.closeEntry();
+                try
+                {
+                    jarOut.putNextEntry(new ZipEntry(name));
+                    jarOut.write(Resources.toByteArray(f.toURI().toURL()));
+                } finally
+                {
+                    jarOut.closeEntry();
+                }
             }
         }
     }

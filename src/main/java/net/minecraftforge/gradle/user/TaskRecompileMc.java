@@ -123,22 +123,28 @@ public class TaskRecompileMc extends CachedTask
 
     private static void extractSources(File tempDir, File inJar) throws IOException
     {
-        ZipInputStream zin = new ZipInputStream(new FileInputStream(inJar));
-        ZipEntry entry = null;
-
-        while ((entry = zin.getNextEntry()) != null)
+        try (ZipInputStream zin = new ZipInputStream(new FileInputStream(inJar)))
         {
-            // we dont care about directories.. we can make em later when needed
-            // we only want java files to compile too, can grab the other resources from the jar later
-            if (entry.isDirectory() || !entry.getName().endsWith(".java"))
-                continue;
+            ZipEntry entry;
 
-            File out = new File(tempDir, entry.getName());
-            out.getParentFile().mkdirs();
-            Files.asByteSink(out).writeFrom(zin);
+            while ((entry = zin.getNextEntry()) != null)
+            {
+                try
+                {
+                    // we dont care about directories.. we can make em later when needed
+                    // we only want java files to compile too, can grab the other resources from the jar later
+                    if (entry.isDirectory() || !entry.getName().endsWith(".java"))
+                        continue;
+
+                    File out = new File(tempDir, entry.getName());
+                    out.getParentFile().mkdirs();
+                    Files.asByteSink(out).writeFrom(zin);
+                } finally
+                {
+                    zin.closeEntry();
+                }
+            }
         }
-
-        zin.close();
     }
 
     private void createOutput(File outJar, File sourceJar, File classDir, File resourceJar) throws IOException
@@ -187,7 +193,13 @@ public class TaskRecompileMc extends CachedTask
 
                 entries.add(name);
                 ZipEntry entry = new ZipEntry(name);
-                zout.putNextEntry(entry);
+                try
+                {
+                    zout.putNextEntry(entry);
+                } finally
+                {
+                    zout.closeEntry();
+                }
             }
             catch (IOException e)
             {
@@ -206,7 +218,13 @@ public class TaskRecompileMc extends CachedTask
                     return;
 
                 entries.add(name);
-                zout.putNextEntry(new ZipEntry(name));
+                try
+                {
+                    zout.putNextEntry(new ZipEntry(name));
+                } finally
+                {
+                    zout.closeEntry();
+                }
 
                 file.copyTo(zout);
             }

@@ -86,33 +86,10 @@ public class MergeJars extends CachedTask
 
     private void processJar(File clientInFile, File serverInFile, File outFile) throws IOException
     {
-        ZipFile cInJar = null;
-        ZipFile sInJar = null;
-        ZipOutputStream outJar = null;
-
-        try
+        try (ZipFile cInJar = new ZipFile(clientInFile);
+             ZipFile sInJar = new ZipFile(serverInFile);
+             ZipOutputStream outJar = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outFile))))
         {
-            try
-            {
-                cInJar = new ZipFile(clientInFile);
-                sInJar = new ZipFile(serverInFile);
-            }
-            catch (FileNotFoundException e)
-            {
-                throw new FileNotFoundException("Could not open input file: " + e.getMessage());
-            }
-
-            // different messages.
-
-            try
-            {
-                outJar = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outFile)));
-            }
-            catch (FileNotFoundException e)
-            {
-                throw new FileNotFoundException("Could not open output file: " + e.getMessage());
-            }
-
             // read in the jars, and initalize some variables
             HashSet<String> resources = new HashSet<String>();
             HashMap<String, ZipEntry> cClasses = getClassEntries(cInJar, outJar, resources);
@@ -139,8 +116,12 @@ public class MergeJars extends CachedTask
                 byte[] data = processClass(cData, sData);
 
                 ZipEntry newEntry = new ZipEntry(cEntry.getName());
-                outJar.putNextEntry(newEntry);
-                outJar.write(data);
+                try {
+                    outJar.putNextEntry(newEntry);
+                    outJar.write(data);
+                } finally {
+                    outJar.closeEntry();
+                }
                 cAdded.add(name);
             }
 
@@ -160,43 +141,19 @@ public class MergeJars extends CachedTask
                 ZipEntry newEntry = new ZipEntry(classPath);
                 if (!cAdded.contains(eName))
                 {
-                    outJar.putNextEntry(newEntry);
-                    outJar.write(getClassBytes(name));
+                    try {
+                        outJar.putNextEntry(newEntry);
+                        outJar.write(getClassBytes(name));
+                    } finally {
+                        outJar.closeEntry();
+                    }
                 }
             }
 
         }
-        finally
+        catch (FileNotFoundException e)
         {
-            if (cInJar != null)
-            {
-                try
-                {
-                    cInJar.close();
-                }
-                catch (IOException e)
-                {}
-            }
-
-            if (sInJar != null)
-            {
-                try
-                {
-                    sInJar.close();
-                }
-                catch (IOException e)
-                {}
-            }
-            if (outJar != null)
-            {
-                try
-                {
-                    outJar.close();
-                }
-                catch (IOException e)
-                {}
-            }
-
+            throw new FileNotFoundException("Could not open input/output file: " + e.getMessage());
         }
     }
 
@@ -220,14 +177,23 @@ public class MergeJars extends CachedTask
         ZipEntry newEntry = new ZipEntry(entry.getName());
         if (outJar != null)
         {
-            outJar.putNextEntry(newEntry);
-            outJar.write(data);
+            try
+            {
+                outJar.putNextEntry(newEntry);
+                outJar.write(data);
+            } finally
+            {
+                outJar.closeEntry();
+            }
         }
     }
 
     private byte[] readEntry(ZipFile inFile, ZipEntry entry) throws IOException
     {
-        return ByteStreams.toByteArray(inFile.getInputStream(entry));
+        try (InputStream is = inFile.getInputStream(entry))
+        {
+            return ByteStreams.toByteArray(is);
+        }
     }
 
     private AnnotationNode getSideAnn(boolean isClientOnly)
@@ -274,8 +240,14 @@ public class MergeJars extends CachedTask
                 if (!resources.contains(entryName))
                 {
                     ZipEntry newEntry = new ZipEntry(entryName);
-                    outFile.putNextEntry(newEntry);
-                    outFile.write(readEntry(inFile, entry));
+                    try
+                    {
+                        outFile.putNextEntry(newEntry);
+                        outFile.write(readEntry(inFile, entry));
+                    } finally
+                    {
+                        outFile.closeEntry();
+                    }
                     resources.add(entryName);
                 }
             }

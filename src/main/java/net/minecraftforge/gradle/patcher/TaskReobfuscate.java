@@ -94,14 +94,14 @@ class TaskReobfuscate extends DefaultTask
         }
         
         // append SRG
-        BufferedWriter writer = new BufferedWriter(new FileWriter(srg, true));
-        for (String line : extraSrg)
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(srg, true)))
         {
-            writer.write(line);
-            writer.newLine();
+            for (String line : extraSrg)
+            {
+                writer.write(line);
+                writer.newLine();
+            }
         }
-        writer.flush();
-        writer.close();
 
         obfuscate(inJar, getLibs(), srg);
     }

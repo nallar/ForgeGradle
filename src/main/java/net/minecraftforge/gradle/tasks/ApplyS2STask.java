@@ -195,88 +195,89 @@ public class ApplyS2STask extends DefaultTask
             temp.getParentFile().mkdirs();
             temp.createNewFile();
 
-            BufferedWriter writer = Files.newWriter(temp, Charsets.UTF_8);
-            for (File f : srgs)
+            try (BufferedWriter writer = Files.newWriter(temp, Charsets.UTF_8))
             {
-                getLogger().debug("  Reading SRG: " + f);
-                for (String line : Files.readLines(f, Charset.defaultCharset()))
+                for (File f : srgs)
                 {
-                    if (Strings.isNullOrEmpty(line) || line.startsWith("#"))
-                        continue;
-
-                    String type = line.substring(0, 2);
-                    line = line.substring(4);
-                    String[] pts = line.split(" ");
-
-                    if (type.equals("MD"))
+                    getLogger().debug("  Reading SRG: " + f);
+                    for (String line : Files.readLines(f, Charset.defaultCharset()))
                     {
-                        String name = pts[2].substring(pts[2].lastIndexOf('/') + 1);
-                        if (name.startsWith("func_"))
+                        if (Strings.isNullOrEmpty(line) || line.startsWith("#"))
+                            continue;
+
+                        String type = line.substring(0, 2);
+                        line = line.substring(4);
+                        String[] pts = line.split(" ");
+
+                        if (type.equals("MD"))
                         {
-                            Boolean isStatic = statics.get(pts[0] + pts[1]);
-                            getLogger().debug("    MD: " + line);
-                            name = name.substring(5, name.indexOf('_', 5));
-
-                            List<String> params = Lists.newArrayList();
-                            int idx = isStatic == null || !isStatic.booleanValue() ? 1 : 0;
-                            getLogger().debug("      Name: " + name + " Idx: " + idx);
-
-                            int i = 0;
-                            boolean inArray = false;
-                            while (i < pts[1].length())
+                            String name = pts[2].substring(pts[2].lastIndexOf('/') + 1);
+                            if (name.startsWith("func_"))
                             {
-                                char c = pts[1].charAt(i);
+                                Boolean isStatic = statics.get(pts[0] + pts[1]);
+                                getLogger().debug("    MD: " + line);
+                                name = name.substring(5, name.indexOf('_', 5));
 
-                                switch (c)
+                                List<String> params = Lists.newArrayList();
+                                int idx = isStatic == null || !isStatic.booleanValue() ? 1 : 0;
+                                getLogger().debug("      Name: " + name + " Idx: " + idx);
+
+                                int i = 0;
+                                boolean inArray = false;
+                                while (i < pts[1].length())
                                 {
-                                    case '(': //Start
-                                        break;
-                                    case ')': //End
-                                        i = pts[1].length();
-                                        break;
-                                    case '[': //Array
-                                        inArray = true;
-                                        break;
-                                    case 'L': //Class
-                                        String right = pts[1].substring(i);
-                                        String className = right.substring(1, right.indexOf(';'));
-                                        i += className.length() + 1;
-                                        params.add("p_" + name + "_" + idx++ + "_");
-                                        inArray = false;
-                                        break;
-                                    case 'B':
-                                    case 'C':
-                                    case 'D':
-                                    case 'F':
-                                    case 'I':
-                                    case 'J':
-                                    case 'S':
-                                    case 'Z':
-                                        params.add("p_" + name + "_" + idx++ + "_");
-                                        if ((c == 'D' || c == 'J') && !inArray) idx++;
-                                        inArray = false;
-                                        break;
-                                    default:
-                                        throw new IllegalArgumentException("Unrecognized type in method descriptor: " + c);
-                                }
-                                i++;
-                            }
+                                    char c = pts[1].charAt(i);
 
-                            if (params.size() > 0)
-                            {
-                                writer.write(pts[2].substring(0, pts[2].lastIndexOf('/')));
-                                writer.write('.');
-                                writer.write(pts[2].substring(pts[2].lastIndexOf('/') + 1));
-                                writer.write(pts[3]);
-                                writer.write("=|");
-                                writer.write(Joiner.on(',').join(params));
-                                writer.newLine();
+                                    switch (c)
+                                    {
+                                        case '(': //Start
+                                            break;
+                                        case ')': //End
+                                            i = pts[1].length();
+                                            break;
+                                        case '[': //Array
+                                            inArray = true;
+                                            break;
+                                        case 'L': //Class
+                                            String right = pts[1].substring(i);
+                                            String className = right.substring(1, right.indexOf(';'));
+                                            i += className.length() + 1;
+                                            params.add("p_" + name + "_" + idx++ + "_");
+                                            inArray = false;
+                                            break;
+                                        case 'B':
+                                        case 'C':
+                                        case 'D':
+                                        case 'F':
+                                        case 'I':
+                                        case 'J':
+                                        case 'S':
+                                        case 'Z':
+                                            params.add("p_" + name + "_" + idx++ + "_");
+                                            if ((c == 'D' || c == 'J') && !inArray) idx++;
+                                            inArray = false;
+                                            break;
+                                        default:
+                                            throw new IllegalArgumentException("Unrecognized type in method descriptor: " + c);
+                                    }
+                                    i++;
+                                }
+
+                                if (params.size() > 0)
+                                {
+                                    writer.write(pts[2].substring(0, pts[2].lastIndexOf('/')));
+                                    writer.write('.');
+                                    writer.write(pts[2].substring(pts[2].lastIndexOf('/') + 1));
+                                    writer.write(pts[3]);
+                                    writer.write("=|");
+                                    writer.write(Joiner.on(',').join(params));
+                                    writer.newLine();
+                                }
                             }
                         }
                     }
                 }
             }
-            writer.close();
 
             List<File> files = Lists.newArrayList();
             files.add(temp);//Make sure the new one is first to allow others to override

@@ -158,15 +158,14 @@ public class TaskSingleReobf extends DefaultTask
                 srgLines.createNewFile();
             }
 
-            BufferedWriter writer = Files.newWriter(srgLines, Charsets.UTF_8);
-            for (String line : getExtraSrgLines())
+            try (BufferedWriter writer = Files.newWriter(srgLines, Charsets.UTF_8))
             {
-                writer.write(line);
-                writer.newLine();
+                for (String line : getExtraSrgLines())
+                {
+                    writer.write(line);
+                    writer.newLine();
+                }
             }
-
-            writer.flush();
-            writer.close();
         }
 
         // prepare jar for reobf
@@ -238,39 +237,38 @@ public class TaskSingleReobf extends DefaultTask
 
     private void applyExtraTransformers(File inJar, File outJar, List<ReobfTransformer> transformers) throws IOException
     {
-        ZipFile in = new ZipFile(inJar);
-        final ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outJar)));
+        try (ZipFile in = new ZipFile(inJar)) {
+            try (ZipOutputStream out = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(outJar)))) {
+                for (ZipEntry e : Collections.list(in.entries())) {
+                    if (e.isDirectory()) {
+                        try {
+                            out.putNextEntry(e);
+                        } finally {
+                            out.closeEntry();
+                        }
+                    } else {
+                        ZipEntry n = new ZipEntry(e.getName());
+                        n.setTime(e.getTime());
+                        try {
+                            out.putNextEntry(n);
 
-        for (ZipEntry e : Collections.list(in.entries()))
-        {
-            if (e.isDirectory())
-            {
-                out.putNextEntry(e);
-            }
-            else
-            {
-                ZipEntry n = new ZipEntry(e.getName());
-                n.setTime(e.getTime());
-                out.putNextEntry(n);
+                            byte[] data = ByteStreams.toByteArray(in.getInputStream(e));
 
-                byte[] data = ByteStreams.toByteArray(in.getInputStream(e));
+                            // correct source name
+                            if (e.getName().endsWith(".class")) {
+                                for (ReobfTransformer trans : transformers) {
+                                    data = trans.transform(data);
+                                }
+                            }
 
-                // correct source name
-                if (e.getName().endsWith(".class"))
-                {
-                    for (ReobfTransformer trans : transformers)
-                    {
-                        data = trans.transform(data);
+                            out.write(data);
+                        } finally {
+                            out.closeEntry();
+                        }
                     }
                 }
-
-                out.write(data);
             }
         }
-
-        out.flush();
-        out.close();
-        in.close();
     }
 
     // Main Jar and classpath
