@@ -24,6 +24,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,6 +34,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import net.md_5.specialsource.provider.ClassLoaderProvider;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.ParallelizableTask;
@@ -219,15 +221,20 @@ public class TaskSingleReobf extends DefaultTask
         JarRemapper remapper = new JarRemapper(null, mapping);
 
         // load jar
-        Jar classPath = classpath == null || classpath.isEmpty() ? null : Jar.init(new ArrayList<>(classpath.getFiles()));
+        URLClassLoader classLoader = null;
+        Jar classPathJar = Constants.toJar(classpath);
+        URL[] classPathFolders = Constants.toUrlsForFilesOnly(classpath);
         try (Jar inputJar = Jar.init(input))
         {
             // ensure that inheritance provider is used
             JointProvider inheritanceProviders = new JointProvider();
             inheritanceProviders.add(new JarProvider(inputJar));
 
-            if (classPath != null)
-                inheritanceProviders.add(new JarProvider(classPath));
+            if (classPathJar != null)
+                inheritanceProviders.add(new JarProvider(classPathJar));
+
+            if (classPathFolders != null)
+                inheritanceProviders.add(new ClassLoaderProvider(classLoader = new URLClassLoader(classPathFolders)));
 
             mapping.setFallbackInheritanceProvider(inheritanceProviders);
 
@@ -235,8 +242,10 @@ public class TaskSingleReobf extends DefaultTask
             remapper.remapJar(inputJar, output);
         } finally
         {
-            if (classPath != null)
-                classPath.close();
+            if (classPathJar != null)
+                classPathJar.close();
+            if (classLoader != null)
+                classLoader.close();
         }
     }
 

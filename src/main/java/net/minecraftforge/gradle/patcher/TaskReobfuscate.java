@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.*;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -32,8 +33,10 @@ import java.util.List;
 import net.md_5.specialsource.Jar;
 import net.md_5.specialsource.JarMapping;
 import net.md_5.specialsource.JarRemapper;
+import net.md_5.specialsource.provider.ClassLoaderProvider;
 import net.md_5.specialsource.provider.JarProvider;
 import net.md_5.specialsource.provider.JointProvider;
+import net.minecraftforge.gradle.common.Constants;
 import net.minecraftforge.gradle.util.mcp.ReobfExceptor;
 
 import org.gradle.api.DefaultTask;
@@ -114,15 +117,20 @@ class TaskReobfuscate extends DefaultTask
         JarRemapper remapper = new JarRemapper(null, mapping);
 
         // load jar
-        Jar classPath = classpath == null || classpath.isEmpty() ? null : Jar.init(new ArrayList<>(classpath.getFiles()));
+        URLClassLoader classLoader = null;
+        Jar classPathJar = Constants.toJar(classpath);
+        URL[] classPathFolders = Constants.toUrlsForFilesOnly(classpath);
         try (Jar input = Jar.init(inJar))
         {
             // ensure that inheritance provider is used
             JointProvider inheritanceProviders = new JointProvider();
             inheritanceProviders.add(new JarProvider(input));
 
-            if (classPath != null)
-                inheritanceProviders.add(new JarProvider(classPath));
+            if (classPathJar != null)
+                inheritanceProviders.add(new JarProvider(classPathJar));
+
+            if (classPathFolders != null)
+                inheritanceProviders.add(new ClassLoaderProvider(classLoader = new URLClassLoader(classPathFolders)));
 
             mapping.setFallbackInheritanceProvider(inheritanceProviders);
 
@@ -133,11 +141,13 @@ class TaskReobfuscate extends DefaultTask
             }
 
             // remap jar
-            remapper.remapJar(input, getOutJar());
+            remapper.remapJar(input, inJar);
         } finally
         {
-            if (classPath != null)
-                classPath.close();
+            if (classPathJar != null)
+                classPathJar.close();
+            if (classLoader != null)
+                classLoader.close();
         }
     }
     

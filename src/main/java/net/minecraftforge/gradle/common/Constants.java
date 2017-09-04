@@ -44,6 +44,8 @@ import java.util.concurrent.Callable;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import net.md_5.specialsource.Jar;
+import net.md_5.specialsource.provider.InheritanceProvider;
 import org.gradle.api.Project;
 import org.gradle.api.file.FileCollection;
 import org.w3c.dom.Document;
@@ -219,6 +221,40 @@ public class Constants
             list.add(url.getPath());
         }
         return list;
+    }
+
+    public static Jar toJar(FileCollection collection) throws IOException
+    {
+        if (collection == null || collection.isEmpty())
+            return null;
+
+        ArrayList<File> files = new ArrayList<>();
+        for (File file : collection)
+        {
+            if (file.isFile())
+                files.add(file);
+        }
+
+        if (files.isEmpty())
+            return null;
+
+        return Jar.init(files);
+    }
+
+    public static URL[] toUrlsForFilesOnly(FileCollection collection) throws MalformedURLException
+    {
+        if (collection == null || collection.isEmpty())
+            return null;
+
+        ArrayList<URL> urls = new ArrayList<>();
+
+        for (File file : collection.getFiles())
+            urls.add(file.toURI().toURL());
+
+        if (urls.isEmpty())
+            return null;
+
+        return urls.toArray(new URL[urls.size()]);
     }
 
     public static URL[] toUrls(FileCollection collection) throws MalformedURLException
