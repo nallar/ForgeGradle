@@ -24,7 +24,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -48,7 +47,6 @@ import groovy.lang.Closure;
 import net.md_5.specialsource.Jar;
 import net.md_5.specialsource.JarMapping;
 import net.md_5.specialsource.JarRemapper;
-import net.md_5.specialsource.provider.ClassLoaderProvider;
 import net.md_5.specialsource.provider.JarProvider;
 import net.md_5.specialsource.provider.JointProvider;
 import net.minecraftforge.gradle.common.Constants;
@@ -221,17 +219,24 @@ public class TaskSingleReobf extends DefaultTask
         JarRemapper remapper = new JarRemapper(null, mapping);
 
         // load jar
+        Jar classPath = classpath == null || classpath.isEmpty() ? null : Jar.init(new ArrayList<>(classpath.getFiles()));
         try (Jar inputJar = Jar.init(input))
         {
             // ensure that inheritance provider is used
             JointProvider inheritanceProviders = new JointProvider();
             inheritanceProviders.add(new JarProvider(inputJar));
-            if (classpath != null)
-                inheritanceProviders.add(new ClassLoaderProvider(new URLClassLoader(Constants.toUrls(classpath))));
+
+            if (classPath != null)
+                inheritanceProviders.add(new JarProvider(classPath));
+
             mapping.setFallbackInheritanceProvider(inheritanceProviders);
 
             // remap jar
             remapper.remapJar(inputJar, output);
+        } finally
+        {
+            if (classPath != null)
+                classPath.close();
         }
     }
 

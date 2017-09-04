@@ -24,18 +24,16 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.net.URLClassLoader;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 import net.md_5.specialsource.Jar;
 import net.md_5.specialsource.JarMapping;
 import net.md_5.specialsource.JarRemapper;
-import net.md_5.specialsource.provider.ClassLoaderProvider;
 import net.md_5.specialsource.provider.JarProvider;
 import net.md_5.specialsource.provider.JointProvider;
-import net.minecraftforge.gradle.common.Constants;
 import net.minecraftforge.gradle.util.mcp.ReobfExceptor;
 
 import org.gradle.api.DefaultTask;
@@ -116,14 +114,15 @@ class TaskReobfuscate extends DefaultTask
         JarRemapper remapper = new JarRemapper(null, mapping);
 
         // load jar
+        Jar classPath = classpath == null || classpath.isEmpty() ? null : Jar.init(new ArrayList<>(classpath.getFiles()));
         try (Jar input = Jar.init(inJar))
         {
             // ensure that inheritance provider is used
             JointProvider inheritanceProviders = new JointProvider();
             inheritanceProviders.add(new JarProvider(input));
 
-            if (classpath != null)
-                inheritanceProviders.add(new ClassLoaderProvider(new URLClassLoader(Constants.toUrls(classpath))));
+            if (classPath != null)
+                inheritanceProviders.add(new JarProvider(classPath));
 
             mapping.setFallbackInheritanceProvider(inheritanceProviders);
 
@@ -135,6 +134,10 @@ class TaskReobfuscate extends DefaultTask
 
             // remap jar
             remapper.remapJar(input, getOutJar());
+        } finally
+        {
+            if (classPath != null)
+                classPath.close();
         }
     }
     
